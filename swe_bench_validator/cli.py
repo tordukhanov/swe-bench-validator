@@ -2,9 +2,10 @@
 Command-line interface for the SWE-bench data point validator.
 """
 
-import click
 import sys
 from pathlib import Path
+
+import click
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
@@ -16,20 +17,20 @@ console = Console()
 
 @click.command()
 @click.argument(
-    'datapoint_path',
+    "datapoint_path",
     type=click.Path(exists=True, path_type=Path),
 )
 @click.option(
-    '--timeout',
+    "--timeout",
     type=int,
     default=900,
-    help='Timeout for evaluation in seconds (default: 900 / 15 minutes)',
+    help="Timeout for evaluation in seconds (default: 900 / 15 minutes)",
 )
 @click.option(
-    '--verbose',
-    '-v',
+    "--verbose",
+    "-v",
     is_flag=True,
-    help='Enable verbose output',
+    help="Enable verbose output",
 )
 def main(datapoint_path: Path, timeout: int, verbose: bool):
     """
@@ -66,10 +67,7 @@ def main(datapoint_path: Path, timeout: int, verbose: bool):
         validator = SWEBenchValidator(timeout=timeout, verbose=verbose)
 
         # Run validation
-        with console.status(
-            "[bold green]Running validation...",
-            spinner="dots"
-        ):
+        with console.status("[bold green]Running validation...", spinner="dots"):
             result = validator.validate(datapoint_path)
 
         # Display results
@@ -99,7 +97,9 @@ def _display_result(result: ValidationResult):
     table.add_row("Instance ID", result.instance_id)
     table.add_row(
         "Status",
-        f"[bold green] PASSED[/bold green]" if result.passed else "[bold red] FAILED[/bold red]"
+        "[bold green] PASSED[/bold green]"
+        if result.passed
+        else "[bold red] FAILED[/bold red]",
     )
     table.add_row("Message", result.message)
 
