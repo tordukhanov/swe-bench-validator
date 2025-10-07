@@ -1,0 +1,116 @@
+name: Validate SWE-bench Data Points
+
+on:
+  push:
+    paths:
+      - 'data_points/**/*.json'
+  pull_request:
+    paths:
+      - 'data_points/**/*.json'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120  # 2 hours max for validation
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history for changed files detection
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+
+      - name: Install Docker
+        run: |
+          # Docker is pre-installed on ubuntu-latest runners
+          docker --version
+
+      - name: Install dependencies
+        run: |
+          uv sync
+
+      - name: Get changed data point files
+        id: changed-files
+        uses: tj-actions/changed-files@v44
+        with:
+          files: |
+            data_points/**/*.json
+
+      - name: Validate changed data points
+        if: steps.changed-files.outputs.any_changed == 'true'
+        env:
+          CHANGED_FILES: ${{ steps.changed-files.outputs.all_changed_files }}
+        run: |
+          echo "Validating changed data points..."
+          echo "Changed files: $CHANGED_FILES"
+
+          # Track validation results
+          failed_files=""
+          success_count=0
+          fail_count=0
+
+          # Validate each changed file
+          for file in $CHANGED_FILES; do
+            echo ""
+            echo "========================================="
+            echo "Validating: $file"
+            echo "========================================="
+
+            if uv run swe-bench-validate "$file" --verbose --timeout 1800; then
+              echo "✓ PASSED: $file"
+              success_count=$((success_count + 1))
+            else
+              echo "✗ FAILED: $file"
+              failed_files="$failed_files\n- $file"
+              fail_count=$((fail_count + 1))
+            fi
+          done
+
+          # Print summary
+          echo ""
+          echo "========================================="
+          echo "Validation Summary"
+          echo "========================================="
+          echo "Total files validated: $((success_count + fail_count))"
+          echo "Passed: $success_count"
+          echo "Failed: $fail_count"
+
+          # Fail the workflow if any validations failed
+          if [ $fail_count -gt 0 ]; then
+            echo ""
+            echo "❌ Validation failed for the following files:"
+            echo -e "$failed_files"
+            exit 1
+          else
+            echo ""
+            echo "✅ All validations passed!"
+          fi
+
+      - name: Upload validation logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: validation-logs
+          path: logs/
+          retention-days: 7
+
+      - name: Comment PR with results
+        if: github.event_name == 'pull_request' && failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '❌ SWE-bench data point validation failed. Please check the workflow logs for details.'
+            })

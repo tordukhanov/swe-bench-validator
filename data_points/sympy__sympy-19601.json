@@ -1,0 +1,20 @@
+{
+  "repo": "sympy/sympy",
+  "instance_id": "sympy__sympy-19601",
+  "base_commit": "28b41c73c12b70d6ad9f6e45109a80649c4456da",
+  "patch": "diff --git a/sympy/simplify/radsimp.py b/sympy/simplify/radsimp.py\n--- a/sympy/simplify/radsimp.py\n+++ b/sympy/simplify/radsimp.py\n@@ -178,7 +178,7 @@ def collect(expr, syms, func=None, evaluate=None, exact=False, distribute_order_\n         if not isinstance(rv, dict):\n             return rv.xreplace(urep)\n         else:\n-            return {urep.get(k, k): v for k, v in rv.items()}\n+            return {urep.get(k, k): v.xreplace(urep) for k, v in rv.items()}\n \n     if evaluate is None:\n         evaluate = global_parameters.evaluate\n",
+  "test_patch": "diff --git a/sympy/simplify/tests/test_radsimp.py b/sympy/simplify/tests/test_radsimp.py\n--- a/sympy/simplify/tests/test_radsimp.py\n+++ b/sympy/simplify/tests/test_radsimp.py\n@@ -223,6 +223,12 @@ def test_collect_5():\n                    [x, y]) == 1 + y + x*(1 + 2*y) + x**2 + y**2\n \n \n+def test_collect_pr19431():\n+    \"\"\"Unevaluated collect with respect to a product\"\"\"\n+    a = symbols('a')\n+    assert collect(a**2*(a**2 + 1), a**2, evaluate=False)[a**2] == (a**2 + 1)\n+\n+\n def test_collect_D():\n     D = Derivative\n     f = Function('f')\n",
+  "problem_statement": "sympy 1.6.1 ?\nHi, is there any plan on releasing 1.6.1, just like we had 1.5.1 shortly after 1.5? [We're unfortunately stuck with 1.5.1](https://github.com/devitocodes/devito/blob/master/requirements.txt#L3), but the patches we've submitted have already been merged into SymPy master, and we're looking forward to jump to 1.6. Thanks!\n",
+  "hints_text": "",
+  "created_at": "2020-06-20T11:23:02Z",
+  "version": "1.6",
+  "FAIL_TO_PASS": "[\"test_collect_pr19431\"]",
+  "PASS_TO_PASS": "[\"test_radsimp\", \"test_radsimp_issue_3214\", \"test_collect_1\", \"test_collect_2\", \"test_collect_3\", \"test_collect_4\", \"test_collect_5\", \"test_collect_D\", \"test_collect_func\", \"test_collect_order\", \"test_rcollect\", \"test_collect_D_0\", \"test_collect_Wild\", \"test_collect_const\", \"test_issue_13143\", \"test_issue_6097\", \"test_fraction_expand\", \"test_fraction\", \"test_issue_5615\", \"test_issue_5933\", \"test_issue_14608\", \"test_collect_abs\"]",
+  "environment_setup_commit": "28b41c73c12b70d6ad9f6e45109a80649c4456da",
+  "_download_metadata": {
+    "downloaded_at": "2025-10-07T21:23:31.134402",
+    "dataset_name": "swe-bench",
+    "split": "test",
+    "downloader_version": "0.1.0"
+  }
+}

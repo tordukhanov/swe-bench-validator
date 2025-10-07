@@ -1,0 +1,20 @@
+{
+  "repo": "sympy/sympy",
+  "instance_id": "sympy__sympy-19110",
+  "base_commit": "542a1758e517c3b5e95e480dcd49b9b24a01f191",
+  "patch": "diff --git a/sympy/matrices/expressions/matexpr.py b/sympy/matrices/expressions/matexpr.py\n--- a/sympy/matrices/expressions/matexpr.py\n+++ b/sympy/matrices/expressions/matexpr.py\n@@ -996,12 +996,6 @@ def conjugate(self):\n     def _entry(self, i, j, **kwargs):\n         return S.Zero\n \n-    def __nonzero__(self):\n-        return False\n-\n-    __bool__ = __nonzero__\n-\n-\n class GenericZeroMatrix(ZeroMatrix):\n     \"\"\"\n     A zero matrix without a specified shape\n",
+  "test_patch": "diff --git a/sympy/matrices/expressions/tests/test_matexpr.py b/sympy/matrices/expressions/tests/test_matexpr.py\n--- a/sympy/matrices/expressions/tests/test_matexpr.py\n+++ b/sympy/matrices/expressions/tests/test_matexpr.py\n@@ -127,7 +127,7 @@ def test_ZeroMatrix():\n     assert Z*A.T == ZeroMatrix(n, n)\n     assert A - A == ZeroMatrix(*A.shape)\n \n-    assert not Z\n+    assert Z\n \n     assert transpose(Z) == ZeroMatrix(m, n)\n     assert Z.conjugate() == Z\n",
+  "problem_statement": "ZeroMatrix should not be falsey\nWe have:\r\n```julia\r\nIn [10]: Z = ZeroMatrix(2, 3)                                                                                                     \r\n\r\nIn [11]: Ze = Z.as_explicit()                                                                                                     \r\n\r\nIn [12]: Z                                                                                                                        \r\nOut[12]: 𝟘\r\n\r\nIn [13]: Ze                                                                                                                       \r\nOut[13]: \r\n⎡0  0  0⎤\r\n⎢       ⎥\r\n⎣0  0  0⎦\r\n\r\nIn [14]: bool(Z)                                                                                                                  \r\nOut[14]: False\r\n\r\nIn [15]: bool(Ze)                                                                                                                 \r\nOut[15]: True\r\n```\r\nI don't see any sense in having a ZeroMatrix instance evaluate to False. This happens because of the `__nonzero__` method defined for `ZeroMatrix`:\r\nhttps://github.com/sympy/sympy/blob/542a1758e517c3b5e95e480dcd49b9b24a01f191/sympy/matrices/expressions/matexpr.py#L999-L1002\r\nThe `__nonzero__` method is not needed now that Python 2 is not supported. The `__bool__` method is not needed because a `ZeroMatrix` should not evaluate to False in a boolean context.\r\n\r\nThe linked lines of code should simply be removed.\n",
+  "hints_text": "",
+  "created_at": "2020-04-13T02:35:06Z",
+  "version": "1.6",
+  "FAIL_TO_PASS": "[\"test_ZeroMatrix\"]",
+  "PASS_TO_PASS": "[\"test_matrix_symbol_creation\", \"test_zero_matrix_creation\", \"test_one_matrix_creation\", \"test_identity_matrix_creation\", \"test_shape\", \"test_matexpr\", \"test_subs\", \"test_ZeroMatrix_doit\", \"test_OneMatrix\", \"test_OneMatrix_doit\", \"test_OneMatrix_mul\", \"test_Identity\", \"test_Identity_doit\", \"test_addition\", \"test_multiplication\", \"test_MatPow\", \"test_MatrixSymbol\", \"test_dense_conversion\", \"test_free_symbols\", \"test_zero_matmul\", \"test_matadd_simplify\", \"test_matmul_simplify\", \"test_invariants\", \"test_indexing\", \"test_single_indexing\", \"test_MatrixElement_commutative\", \"test_MatrixSymbol_determinant\", \"test_MatrixElement_diff\", \"test_MatrixElement_doit\", \"test_identity_powers\", \"test_Zero_power\", \"test_matrixelement_diff\", \"test_MatrixElement_with_values\", \"test_inv\", \"test_issue_2749\", \"test_issue_2750\", \"test_issue_7842\", \"test_generic_zero_matrix\", \"test_generic_identity\", \"test_MatMul_postprocessor\", \"test_MatAdd_postprocessor\", \"test_simplify_matrix_expressions\", \"test_exp\", \"test_invalid_args\"]",
+  "environment_setup_commit": "28b41c73c12b70d6ad9f6e45109a80649c4456da",
+  "_download_metadata": {
+    "downloaded_at": "2025-10-07T21:23:31.132292",
+    "dataset_name": "swe-bench",
+    "split": "test",
+    "downloader_version": "0.1.0"
+  }
+}
