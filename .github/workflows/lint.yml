@@ -1,0 +1,50 @@
+name: Lint Python Code
+
+on:
+  push:
+    paths:
+      - 'swe_bench_validator/**/*.py'
+      - 'swe_bench_downloader/**/*.py'
+      - 'pyproject.toml'
+      - '.github/workflows/lint.yml'
+  pull_request:
+    paths:
+      - 'swe_bench_validator/**/*.py'
+      - 'swe_bench_downloader/**/*.py'
+      - 'pyproject.toml'
+      - '.github/workflows/lint.yml'
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: |
+          uv sync --group dev
+
+      - name: Run Ruff (Linter)
+        run: |
+          uv run ruff check swe_bench_validator swe_bench_downloader --output-format=github
+
+      - name: Run Ruff (Formatter Check)
+        run: |
+          uv run ruff format --check swe_bench_validator swe_bench_downloader
+
+      - name: Run mypy (Type Checking)
+        run: |
+          uv run mypy swe_bench_validator swe_bench_downloader --ignore-missing-imports --no-strict-optional --allow-untyped-defs --no-warn-return-any

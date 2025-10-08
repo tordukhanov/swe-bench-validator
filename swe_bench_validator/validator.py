@@ -1,23 +1,26 @@
 """
 Validator functionality for SWE-bench data points.
 """
+
 import json
 import logging
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional
-from dataclasses import dataclass
-from swebench.harness.run_evaluation import run_instances
-from swebench.harness.docker_build import build_instance_images, build_env_images
+
 import docker
+from swebench.harness.docker_build import build_env_images, build_instance_images
+from swebench.harness.run_evaluation import run_instances
+
 
 @dataclass
 class ValidationResult:
     """Result of validating a data point"""
+
     instance_id: str
     passed: bool
     message: str
-    details: Optional[Dict] = None
+    details: dict | None = None
 
 
 class SWEBenchValidator:
@@ -32,7 +35,7 @@ class SWEBenchValidator:
         logger.setLevel(level)
         return logger
 
-    def load_datapoint(self, json_path: Path) -> Dict:
+    def load_datapoint(self, json_path: Path) -> dict:
         """
         Load and validate JSON structure
 
@@ -40,8 +43,12 @@ class SWEBenchValidator:
             ValueError: If JSON is malformed or missing required fields
         """
         required_fields = [
-            "instance_id", "repo", "base_commit", "patch",
-            "FAIL_TO_PASS", "PASS_TO_PASS"
+            "instance_id",
+            "repo",
+            "base_commit",
+            "patch",
+            "FAIL_TO_PASS",
+            "PASS_TO_PASS",
         ]
 
         with open(json_path) as f:
@@ -54,7 +61,7 @@ class SWEBenchValidator:
 
         return data
 
-    def create_prediction(self, datapoint: Dict) -> Dict:
+    def create_prediction(self, datapoint: dict) -> dict:
         """
         Convert data point to SWE-bench prediction format
 
@@ -68,10 +75,10 @@ class SWEBenchValidator:
         return {
             "instance_id": datapoint["instance_id"],
             "model_patch": datapoint["patch"],
-            "model_name_or_path": "golden-validator"
+            "model_name_or_path": "golden-validator",
         }
 
-    def build_docker_images(self, datapoint: Dict, force_rebuild: bool = False):
+    def build_docker_images(self, datapoint: dict, force_rebuild: bool = False):
         """
         Build required Docker images for evaluation
 
@@ -79,7 +86,9 @@ class SWEBenchValidator:
             datapoint: The data point to build images for
             force_rebuild: Whether to force rebuild even if images exist
         """
-        self.logger.info("Building Docker images (this may take a while on first run)...")
+        self.logger.info(
+            "Building Docker images (this may take a while on first run)..."
+        )
 
         # Get Docker client
         client = docker.from_env()
@@ -90,7 +99,7 @@ class SWEBenchValidator:
             client=client,
             dataset=[datapoint],
             force_rebuild=force_rebuild,
-            max_workers=1
+            max_workers=1,
         )
 
         # Build instance image (specific commit + patches)
@@ -101,17 +110,17 @@ class SWEBenchValidator:
             force_rebuild=force_rebuild,
             max_workers=1,
             namespace="swebench",
-            tag="latest"
+            tag="latest",
         )
 
         self.logger.info("Docker images built successfully")
 
     def run_swebench_evaluation(
         self,
-        datapoint: Dict,
-        prediction: Dict,
-        timeout: int = 900  # 15 minutes default
-    ) -> Dict:
+        datapoint: dict,
+        prediction: dict,
+        timeout: int = 900,  # 15 minutes default
+    ) -> dict:
         """
         Run SWE-bench evaluation in Docker
 
@@ -125,9 +134,7 @@ class SWEBenchValidator:
         instances = [datapoint]
 
         # Create predictions dict: {instance_id: prediction}
-        predictions = {
-            datapoint["instance_id"]: prediction
-        }
+        predictions = {datapoint["instance_id"]: prediction}
 
         # Generate unique run ID
         run_id = f"validate_{datapoint['instance_id']}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
@@ -144,11 +151,18 @@ class SWEBenchValidator:
             timeout=timeout,
             namespace="swebench",
             instance_image_tag="latest",
-            rewrite_reports=False
+            rewrite_reports=False,
         )
 
         # Read the report from disk (run_instances writes to logs/)
-        report_path = Path("logs") / "run_evaluation" / run_id / prediction["model_name_or_path"] / datapoint["instance_id"] / "report.json"
+        report_path = (
+            Path("logs")
+            / "run_evaluation"
+            / run_id
+            / prediction["model_name_or_path"]
+            / datapoint["instance_id"]
+            / "report.json"
+        )
 
         if not report_path.exists():
             raise RuntimeError(f"Evaluation report not found at {report_path}")
@@ -158,11 +172,15 @@ class SWEBenchValidator:
 
         # Extract the report for this instance
         if datapoint["instance_id"] not in full_report:
-            raise RuntimeError(f"Instance {datapoint['instance_id']} not found in report")
+            raise RuntimeError(
+                f"Instance {datapoint['instance_id']} not found in report"
+            )
 
         return full_report[datapoint["instance_id"]]
 
-    def validate_test_results(self, datapoint: Dict, eval_result: Dict) -> ValidationResult:
+    def validate_test_results(
+        self, datapoint: dict, eval_result: dict
+    ) -> ValidationResult:
         """
         Check that all required tests pass
 
@@ -196,20 +214,22 @@ class SWEBenchValidator:
 
         # Check if tests resolved the issue
         if not eval_result.get("resolved", False):
-            failed_tests.append("Issue not resolved (not all FAIL_TO_PASS tests passed)")
+            failed_tests.append(
+                "Issue not resolved (not all FAIL_TO_PASS tests passed)"
+            )
 
         if failed_tests:
             return ValidationResult(
                 instance_id=datapoint["instance_id"],
                 passed=False,
                 message=f"Test failures: {len(failed_tests)} test(s) failed",
-                details={"failed_tests": failed_tests}
+                details={"failed_tests": failed_tests},
             )
 
         return ValidationResult(
             instance_id=datapoint["instance_id"],
             passed=True,
-            message="All tests passed"
+            message="All tests passed",
         )
 
     def validate(self, datapoint_path: Path) -> ValidationResult:
@@ -248,5 +268,5 @@ class SWEBenchValidator:
                 instance_id=datapoint.get("instance_id", "unknown"),
                 passed=False,
                 message=f"Validation error: {str(e)}",
-                details={"error_type": type(e).__name__}
+                details={"error_type": type(e).__name__},
             )
