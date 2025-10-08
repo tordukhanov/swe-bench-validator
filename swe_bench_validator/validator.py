@@ -4,6 +4,8 @@ Validator functionality for SWE-bench data points.
 
 import json
 import logging
+import sys
+import warnings
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -11,6 +13,28 @@ from pathlib import Path
 import docker
 from swebench.harness.docker_build import build_env_images, build_instance_images
 from swebench.harness.run_evaluation import run_instances
+
+# Suppress ResourceWarning from urllib3/docker cleanup
+warnings.filterwarnings("ignore", category=ResourceWarning)
+
+# Override sys.unraisablehook to suppress urllib3 cleanup exceptions
+_original_unraisablehook = sys.unraisablehook
+
+
+def _custom_unraisablehook(unraisable):
+    """Filter out urllib3 ValueError exceptions during cleanup"""
+    if (
+        isinstance(unraisable.exc_value, ValueError)
+        and "urllib3" in str(unraisable.object)
+        and "I/O operation on closed file" in str(unraisable.exc_value)
+    ):
+        # Silently ignore urllib3 cleanup errors
+        return
+    # Call original hook for other exceptions
+    _original_unraisablehook(unraisable)
+
+
+sys.unraisablehook = _custom_unraisablehook
 
 
 @dataclass
@@ -33,6 +57,10 @@ class SWEBenchValidator:
         logger = logging.getLogger("swe_bench_validator")
         level = logging.DEBUG if self.verbose else logging.INFO
         logger.setLevel(level)
+
+        # Suppress urllib3 warnings from Docker cleanup
+        logging.getLogger("urllib3").setLevel(logging.CRITICAL)
+
         return logger
 
     def load_datapoint(self, json_path: Path) -> dict:
