@@ -134,7 +134,7 @@ class SWEBenchValidator:
         run_id = f"validate_{datapoint['instance_id']}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
 
         # Run evaluation using SWE-bench harness
-        results = run_instances(
+        run_instances(
             predictions=predictions,
             instances=instances,
             cache_level="env",  # Cache at environment level for speed
@@ -148,12 +148,20 @@ class SWEBenchValidator:
             rewrite_reports=False
         )
 
-        # Results is a list of tuples: (instance_id, report)
-        if results:
-            _, report = results[0]
-            return report
-        else:
-            raise RuntimeError("No evaluation results returned")
+        # Read the report from disk (run_instances writes to logs/)
+        report_path = Path("logs") / "run_evaluation" / run_id / prediction["model_name_or_path"] / datapoint["instance_id"] / "report.json"
+
+        if not report_path.exists():
+            raise RuntimeError(f"Evaluation report not found at {report_path}")
+
+        with open(report_path) as f:
+            full_report = json.load(f)
+
+        # Extract the report for this instance
+        if datapoint["instance_id"] not in full_report:
+            raise RuntimeError(f"Instance {datapoint['instance_id']} not found in report")
+
+        return full_report[datapoint["instance_id"]]
 
     def validate_test_results(self, datapoint: Dict, eval_result: Dict) -> ValidationResult:
         """
@@ -163,26 +171,33 @@ class SWEBenchValidator:
         - All FAIL_TO_PASS tests now pass
         - All PASS_TO_PASS tests still pass
         """
-        import json as json_lib
-
-        fail_to_pass = json_lib.loads(datapoint["FAIL_TO_PASS"])
-        pass_to_pass = json_lib.loads(datapoint["PASS_TO_PASS"])
-
         # Extract test results from eval_result
-        # SWE-bench returns: eval_result["test_results"]
-        test_results = eval_result.get("test_results", {})
+        # SWE-bench format: eval_result["tests_status"]["FAIL_TO_PASS"]["success"/"failure"]
+        tests_status = eval_result.get("tests_status", {})
 
         failed_tests = []
 
-        # Check FAIL_TO_PASS tests
-        for test in fail_to_pass:
-            if test not in test_results or not test_results[test]:
-                failed_tests.append(f"FAIL_TO_PASS test failed: {test}")
+        # Check FAIL_TO_PASS tests - all should be in success list
+        fail_to_pass_status = tests_status.get("FAIL_TO_PASS", {})
+        fail_to_pass_failures = fail_to_pass_status.get("failure", [])
 
-        # Check PASS_TO_PASS tests
-        for test in pass_to_pass:
-            if test not in test_results or not test_results[test]:
-                failed_tests.append(f"PASS_TO_PASS test failed: {test}")
+        for test in fail_to_pass_failures:
+            failed_tests.append(f"FAIL_TO_PASS test failed: {test}")
+
+        # Check PASS_TO_PASS tests - all should be in success list
+        pass_to_pass_status = tests_status.get("PASS_TO_PASS", {})
+        pass_to_pass_failures = pass_to_pass_status.get("failure", [])
+
+        for test in pass_to_pass_failures:
+            failed_tests.append(f"PASS_TO_PASS test failed: {test}")
+
+        # Check if patch was applied successfully
+        if not eval_result.get("patch_successfully_applied", False):
+            failed_tests.append("Patch failed to apply")
+
+        # Check if tests resolved the issue
+        if not eval_result.get("resolved", False):
+            failed_tests.append("Issue not resolved (not all FAIL_TO_PASS tests passed)")
 
         if failed_tests:
             return ValidationResult(
