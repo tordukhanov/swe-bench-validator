@@ -4,10 +4,8 @@ Validator functionality for SWE-bench data points.
 
 import json
 import logging
-from datetime import datetime
-from pathlib import Path
-from typing import Dict, List, Optional
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 
 import docker
@@ -157,7 +155,14 @@ class SWEBenchValidator:
         )
 
         # Read the report from disk (run_instances writes to logs/)
-        report_path = Path("logs") / "run_evaluation" / run_id / prediction["model_name_or_path"] / datapoint["instance_id"] / "report.json"
+        report_path = (
+            Path("logs")
+            / "run_evaluation"
+            / run_id
+            / prediction["model_name_or_path"]
+            / datapoint["instance_id"]
+            / "report.json"
+        )
 
         if not report_path.exists():
             raise RuntimeError(f"Evaluation report not found at {report_path}")
@@ -167,7 +172,9 @@ class SWEBenchValidator:
 
         # Extract the report for this instance
         if datapoint["instance_id"] not in full_report:
-            raise RuntimeError(f"Instance {datapoint['instance_id']} not found in report")
+            raise RuntimeError(
+                f"Instance {datapoint['instance_id']} not found in report"
+            )
 
         return full_report[datapoint["instance_id"]]
 
@@ -207,7 +214,9 @@ class SWEBenchValidator:
 
         # Check if tests resolved the issue
         if not eval_result.get("resolved", False):
-            failed_tests.append("Issue not resolved (not all FAIL_TO_PASS tests passed)")
+            failed_tests.append(
+                "Issue not resolved (not all FAIL_TO_PASS tests passed)"
+            )
 
         if failed_tests:
             return ValidationResult(
